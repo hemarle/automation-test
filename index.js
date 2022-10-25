@@ -1,6 +1,7 @@
 import puppeteer from "puppeteer";
+import { converter } from "./helper.js";
 
-const bookingCode = "83E5207";
+const bookingCode = "C71ACAD3";
 const bookingCodeSelector = ".m-betslip-search input";
 const loadCodeSelector = ".m-betslip-search button";
 const loadedBetSelector = "#j_betslip .m-list";
@@ -11,7 +12,7 @@ var betSlip = [];
   const browser = await puppeteer.launch({ headless: false });
   const page = await browser.newPage();
 
-  await loadSporty();
+  let sportList = await loadSporty();
 
   async function loadSporty() {
     await page.goto("https://sportybet.com", {
@@ -37,124 +38,185 @@ var betSlip = [];
       return betArray;
     });
 
-    console.log("betArray: ", betList);
+    return betList;
   }
+  // console.log("betArray: ", sportList);
 
-  //M-sport logic starts here
-  /*
-  await page.goto("https://msport.com", {
-    timeout: 0,
-    waitUntil: "networkidle2",
-  });
+  let bookingCodes = await bookMsport(sportList);
 
-  for (let bet in betArray) {
-    await loadSelection(betArray[bet][1].trim());
-    await page.waitForTimeout(1000);
-  } //   await page.type(".search-bar .v-input--inner", betArray[bet][1]);
-  await page.click(".get-code");
-  await page.waitForSelector(".m-share-booking-code", { timeout: 0 });
-  await page.evaluate(() =>
-    console.log(
-      document.querySelector(".m-share-booking-code .m-value").innerText
-    )
-  );
-  // await loadSelection("Indiana Pacers v Detroit Pistons");
-
-  // await page.waitForTimeout(1000);
-  // await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 0 });
-  // await loadSelection("Orlando Magic v Boston Celtics");
-
-  async function loadSelection(para) {
-    await page.click(".nav-tool a.btn").then(console.log("done"));
-    await page.type(".search-bar .v-input--inner", para);
-
-    await page.waitForSelector(".nav-wrap", { timeout: 0, visible: true });
-    let c = await page.$$(".snap-nav-item");
-
-    for (let i = 0; i < c.length; i++) {
-      let text = await c[i].$eval(
-        ".item-label",
-        (options) => options.innerText
-      );
-      if (text == "Basketball") {
-        console.log("inter");
-        c[i].click();
-      }
-    }
-    let nav = await page.waitForNavigation({
-      waitUntil: "networkidle0",
-      timeout: 0,
-    });
-    await page.waitForTimeout(1000);
-    let eventLink = await page.$(".event-link");
-    try {
-      // if (eventLink) {
-      await eventLink.click();
-      // }
-    } catch (e) {
-      console.log(e, "exception");
-    }
+  async function bookMsport(betOptions) {
+    //M-sport logic starts here
 
     try {
-      await page.waitForSelector(".m-market-specifier", {
+      await page.goto("https://msport.com", {
         timeout: 0,
-        visible: true,
+        waitUntil: "networkidle2",
       });
-      // let dat = await page.$$(".m-market-item--content");
-      // let dat = await page.$$(".m-market-specifier .m-market-single-line .m-market-row");
-      let dat = await page.$$(".m-market-specifier .m-market-row");
-      console.log("data: ", dat);
-      for (let i = 2; i < dat.length; i++) {
-        try {
-          let option = await dat[i].$eval(
-            ".m-outcome-desc",
-            (options) => options.innerText
-          );
+    } catch {
+      console.log("Network Err");
+    }
 
-          if (betArray[para][0].trim().includes(option)) {
-            page.evaluate(
-              (i, betArray, para) => {
-                let odds = document.querySelectorAll(
-                  ".m-market-specifier .m-market-row "
-                );
+    for (let bet in betOptions) {
+      await loadSelection(betOptions[bet]);
 
-                console.log(
-                  "odds: ",
-                  i,
-                  odds[i].getElementsByClassName("odds")[0]
-                );
-                if (betArray[para][0].trim().includes("Over")) {
-                  return odds[i].getElementsByClassName("odds")[0].click();
-                }
-                if (betArray[para][0].trim().includes("Under")) {
-                  return odds[i].getElementsByClassName("odds")[1].click();
-                }
-              },
-              i,
-              betArray,
-              para
-            );
-            // let tester = await dat[i].$$(".odds")[1];
+      await page.waitForTimeout(1000);
+    }
 
-            // console.log("True", dat[i].$(".odds"));
-          }
+    try {
+      await page.click(".get-code");
+      await page.waitForSelector(".m-share-booking-code", { timeout: 0 });
+      let msportBookingCode = await page.evaluate(
+        () => document.querySelector(".m-share-booking-code .m-value").innerText
+      );
+      return msportBookingCode;
+    } catch {
+      console.log("Could not load code");
+    }
 
-          console.log(
-            option,
-            "test",
-            betArray["Indiana Pacers v Detroit Pistons"][0].trim(),
-            "includes: ",
-            betArray["Indiana Pacers v Detroit Pistons"][0]
-              .trim()
-              .includes(option)
-          );
-        } catch (e) {
-          console.log("no data : ");
+    await console.log("booking code: ", msportBookingCode);
+
+    async function loadSelection(para) {
+      await page.waitForSelector(".nav-tool a.btn", { timeout: 0 });
+
+      await page.click(".nav-tool a.btn").then(console.log("done"));
+      await page.type(".search-bar .v-input--inner", para.option[1].trim());
+
+      await page.waitForSelector(".nav-wrap", { timeout: 0, visible: true });
+      let c = await page.$$(".snap-nav-item");
+
+      //Select sport category(e.g Football, Basketball)
+      for (let i = 0; i < c.length; i++) {
+        let msport_category = await c[i].$eval(
+          ".item-label",
+          (options) => options.innerText
+        );
+
+        if (msport_category.toLowerCase() == para.type.toLowerCase()) {
+          c[i].click();
         }
       }
-    } catch (e) {
-      console.log("exception2:", e);
+
+      let nav = await page.waitForNavigation({
+        waitUntil: "networkidle0",
+        timeout: 0,
+      });
+      await page.waitForTimeout(1000);
+      let eventLink = await page.$(".event-link");
+
+      for (let i = 0; i < 4; i++) {
+        try {
+          // if (eventLink) {
+          await eventLink.click();
+          break;
+          // }
+        } catch (e) {
+          console.log(e, "exception");
+
+          await page.waitForTimeout(1000);
+        }
+      }
+
+      try {
+        await page.waitForSelector(".m-market-specifier", {
+          timeout: 0,
+          visible: true,
+        });
+        // let dat = await page.$$(".m-market-item--content");
+        // let dat = await page.$$(".m-market-specifier .m-market-single-line .m-market-row");
+        // let dat = await page.$$(".m-market-specifier .m-market-row");
+        // console.log("data: ", dat);
+
+        //select bet option - new
+
+        await page.evaluate(
+          (para, converter) => {
+            let lists = document.querySelectorAll(
+              ".m-detail-markets .m-market-list .m-market-item"
+            );
+            for (let i = 0; i < lists.length; i++) {
+              let headers = lists[i].getElementsByClassName(
+                "m-market-item--header"
+              )[0].innerText;
+
+              //For basket ball
+              let sportyConverted;
+              if (para.type.toLowerCase() == "basketball") {
+                sportyConverted =
+                  converter.basket[para.option[2].trim().split("   ")[0]]
+                    .msport;
+              }
+
+              console.log("kai", headers, sportyConverted);
+              if (headers.trim() == sportyConverted.trim()) {
+                let options = lists[i].getElementsByClassName("odds");
+
+                options[0].click();
+                console.log(
+                  "helpless"
+                  // home.length
+                  // para.option[2],
+                  // converter.basket[para.option[2].trim().split("   ")[0]].msport
+                );
+              }
+            }
+          },
+          para,
+          converter
+        );
+
+        //Select bet option -old
+        /*
+          for (let i = 2; i < dat.length; i++) {
+            try {
+              let option = await dat[i].$eval(
+                ".m-outcome-desc",
+                (options) => options.innerText
+              );
+
+              if (betArray[para][0].trim().includes(option)) {
+                page.evaluate(
+                  (i, betArray, para) => {
+                    let odds = document.querySelectorAll(
+                      ".m-market-specifier .m-market-row "
+                    );
+
+                    console.log(
+                      "odds: ",
+                      i,
+                      odds[i].getElementsByClassName("odds")[0]
+                    );
+                    if (betArray[para][0].trim().includes("Over")) {
+                      return odds[i].getElementsByClassName("odds")[0].click();
+                    }
+                    if (betArray[para][0].trim().includes("Under")) {
+                      return odds[i].getElementsByClassName("odds")[1].click();
+                    }
+                  },
+                  i,
+                  betArray,
+                  para
+                );
+                // let tester = await dat[i].$$(".odds")[1];
+
+                // console.log("True", dat[i].$(".odds"));
+              }
+
+              // console.log(
+              //   option,
+              //   "test",
+              //   betArray["Indiana Pacers v Detroit Pistons"][0].trim(),
+              //   "includes: ",
+              //   betArray["Indiana Pacers v Detroit Pistons"][0]
+              //     .trim()
+              //     .includes(option)
+              // );
+            } catch (e) {
+              console.log("no data : ");
+            }
+          }*/
+      } catch (e) {
+        console.log("exception2:", e);
+      }
     }
   }
-*/
 })();
